@@ -18,14 +18,14 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./examples/placeholder.png "Model Visualization"
+[image1]: ./examples/figure_1-2.png "Data histogram"
 [image2]: ./examples/placeholder.png "Grayscaling"
-[image3]: ./examples/placeholder_small.png "Recovery Image"
-[image4]: ./examples/placeholder_small.png "Recovery Image"
-[image5]: ./examples/placeholder_small.png "Recovery Image"
-[image6]: ./examples/placeholder_small.png "Normal Image"
-[image7]: ./examples/placeholder_small.png "Flipped Image"
-
+[image3]: ./examples/left_2017_04_30_00_30_33_799.jpg "Recovery Image"
+[image4]: ./examples/left_2017_04_30_00_31_41_830.jpg "Recovery Image"
+[image5]: ./examples/right_2017_04_30_00_30_36_372.jpg "Recovery Image"
+[image6]: ./examples/origcenter_2017_04_30_00_30_34_057.jpg "Original Image"
+[image7]: ./examples/center_2017_04_30_00_30_34_148.jpg "Zoomed grayscale Image"
+[image8]: ./examples/binary.png "Binary Image"
 ## Rubric Points
 ###Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/432/view) individually and describe how I addressed each point in my implementation.  
 
@@ -48,82 +48,113 @@ python drive.py model.h5
 
 ####3. Submission code is usable and readable
 
-The model.py file contains the code for training and saving the convolution neural network. The file shows the pipeline I used for training and validating the model, and it contains comments to explain how the code works.
+The model.py file contains the code for training and saving the convolution neural network. The file shows the pipeline and various strategy I used for training and validating the model, and it contains comments to explain how the code works.
 
 ###Model Architecture and Training Strategy
 
 ####1. An appropriate model architecture has been employed
+The model employs the nvidia model without dropouts. There is a preprocessing layer for cropping line 437. A lambda layer to achieve 0 mean line 438.
+3 2x2 convolution layers line 439-441 followed by 2 1x1 convolution layers line 442-443. Followed by 5 fully connected layers line 444-448.
 
-My model consists of a convolution neural network with 3x3 filter sizes and depths between 32 and 128 (model.py lines 18-24) 
-
-The model includes RELU layers to introduce nonlinearity (code line 20), and the data is normalized in the model using a Keras lambda layer (code line 18). 
+The five convolution layers mentioned above are followed by RELU activation to introduce non-linearity.
 
 ####2. Attempts to reduce overfitting in the model
 
-The model contains dropout layers in order to reduce overfitting (model.py lines 21). 
-
-The model was trained and validated on different data sets to ensure that the model was not overfitting (code line 10-16). The model was tested by running it through the simulator and ensuring that the vehicle could stay on the track.
-
+The model did not it self contain drop out layer. However only a portion of the total data is used to train the model under 5 epochs. There is also a increase in drop out of lower steering data throughout epochs.
+It is found that using 130k+ data and having 1/5-1/4 data utilized per epoch with steering degradation works best.
 ####3. Model parameter tuning
 
-The model used an adam optimizer, so the learning rate was not tuned manually (model.py line 25).
+The model used an Nadam optimizer and learning rate is set to 0.0001 which seems to minimize loss while still provide reasonable speed at reducing loss.
 
 ####4. Appropriate training data
 
-Training data was chosen to keep the vehicle driving on the road. I used a combination of center lane driving, recovering from the left and right sides of the road ... 
-
-For details about how I created the training data, see the next section. 
+Training data contains the original Udacity driving data plus the manually recorded recovery data as well as data generated through the generator using an assortment of techniques such as flipping, left camera, right camera, rotation, zooming and brightness adjustment.
 
 ###Model Architecture and Training Strategy
 
 ####1. Solution Design Approach
 
-The overall strategy for deriving a model architecture was to ...
+The overall strategy for deriving a model architecture was to have a model that's sufficient at deriving correct behaviour.
+This model have to be reasonably easy to train as well. I started with a few fully connected layers just to get started.
+Clearly this model was not powerful enough to predict correct steering and I therefore switched to using the Nvidia model architecture.
+I am running all of this with an 8GB memory CPU and the sheer amount of data was starting to bog down my computer and causing python to crash.
+At this point I started using a generator. I started with generated middle, left and right images and steering per yield within the model.
+I then added zooming in from 1 to 5 times into the generator with adjusted steering of 0.1. 
+I've attempted to use pretrained VGG but the memory strain was too much for my computer. To backtrack I probably could have reduced the 
+memory consumption by 8 folds but I've abandoned VGG in favor of the Nvidia architecture following some advice from past student submissions.
+The Nvidia architeture contain 2 5x5 convolutional layers with strides of 2 followed by relu activation. This makes for fast processing and still 
+meets my need for the project while keeping training time reasonable. It is then followed by 3x3 convolutional layers that is followed by relu activation.
+This helps the NN look in granular details. There are 10 layers aside from preprocessing layers. I believe this suffices based on my previous experience with project 2.
+Where I had used fewer activations. The model was improving but it seem to have overfitted in that it expects a set number of middle, left, right and zooms in sequence.
+This was when I changed strategy to mark the data for their transformations and using the generator only to apply the transformation and steering adjustments.
+I also performed a shuffle such that these marked data is now randomized. Although this helped it wasn't until I started generating histograms of the data
+that I was able to pinpoint what I need to adjust for the data. I added constraints that the steering should stay between 1 and -1. Then with some finish touch
+ on the steering adjustment for zooming and rotation along with adding preprocessing to grayscale. The model finally performed a full lap on course 1.
 
-My first step was to use a convolution neural network model similar to the ... I thought this model might be appropriate because ...
+ ####2. Final Model Architecture
 
-In order to gauge how well the model was working, I split my image and steering angle data into a training and validation set. I found that my first model had a low mean squared error on the training set but a high mean squared error on the validation set. This implied that the model was overfitting. 
+Some of suggestions were from https://medium.com/@mohankarthik/cloning-a-car-to-mimic-human-driving-5c2f7e8d8aff
+I have followed suggestion for data augmentation but used zoom and rotation instead of shift. I also incorporated a formula of measurement = (1 + math.sqrt(float(abs(measurement))) / 25) * measurement per zoom.
+I also pre mark my data for augmentation so that know exactly what data I am having more of. IE I want a lot more turning data.
 
-To combat the overfitting, I modified the model so that ...
-
-Then I ... 
-
-The final step was to run the simulator to see how well the car was driving around track one. There were a few spots where the vehicle fell off the track... to improve the driving behavior in these cases, I ....
-
-At the end of the process, the vehicle is able to drive autonomously around the track without leaving the road.
-
-####2. Final Model Architecture
-
-The final model architecture (model.py lines 18-24) consisted of a convolution neural network with the following layers and layer sizes ...
-
-Here is a visualization of the architecture (note: visualizing the architecture is optional according to the project rubric)
-
-![alt text][image1]
+Below is a visualization from model summary. Fancy ploty stuff refused to install them selves properly.
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #
+=================================================================
+cropping2d_1 (Cropping2D)    (None, 90, 320, 1)        0
+_________________________________________________________________
+lambda_1 (Lambda)            (None, 90, 320, 1)        0
+_________________________________________________________________
+conv2d_1 (Conv2D)            (None, 43, 158, 24)       624
+_________________________________________________________________
+conv2d_2 (Conv2D)            (None, 20, 77, 36)        21636
+_________________________________________________________________
+conv2d_3 (Conv2D)            (None, 8, 37, 48)         43248
+_________________________________________________________________
+conv2d_4 (Conv2D)            (None, 6, 35, 64)         27712
+_________________________________________________________________
+conv2d_5 (Conv2D)            (None, 4, 33, 64)         36928
+_________________________________________________________________
+flatten_1 (Flatten)          (None, 8448)              0
+_________________________________________________________________
+dense_1 (Dense)              (None, 100)               844900
+_________________________________________________________________
+dense_2 (Dense)              (None, 50)                5050
+_________________________________________________________________
+dense_3 (Dense)              (None, 10)                510
+_________________________________________________________________
+dense_4 (Dense)              (None, 1)                 11
+=================================================================
+Total params: 980,619.0
+Trainable params: 980,619.0
+Non-trainable params: 0.0
+_________________________________________________________________
 
 ####3. Creation of the Training Set & Training Process
 
-To capture good driving behavior, I first recorded two laps on track one using center lane driving. Here is an example image of center lane driving:
+I use the Udacity data for typical driving
 
-![alt text][image2]
-
-I then recorded the vehicle recovering from the left side and right sides of the road back to center so that the vehicle would learn to .... These images show what a recovery looks like starting from ... :
+I then recorded the vehicle recovering from the left side and right sides of the road back to center so that the vehicle would learn to stay off the deep end.
 
 ![alt text][image3]
 ![alt text][image4]
 ![alt text][image5]
 
-Then I repeated this process on track two in order to get more data points.
+I then recorded every failed turns for recovery data.
 
-To augment the data sat, I also flipped images and angles thinking that this would ... For example, here is an image that has then been flipped:
+To augment the data as the original data set was lacking in steep turning angles. I applied transforms on steep angles such as rotation, zooming, flip and finally grayscaling to make it easier to train with. Below are examples of original image and after zooming, flipping and grayscaling.
 
 ![alt text][image6]
 ![alt text][image7]
 
-Etc ....
+After the collection process, I had 130k+ data points with data augmentation. This results in data histogram below.
 
-After the collection process, I had X number of data points. I then preprocessed this data by ...
+![alt text][image1]
 
+I follow the training regiment for training using the retrain input keyword as described in architecture section. Of course I also incorporated a bit of transfer learning to help troubleshoot code and steering adjustments as the training is relatively fast and continue keyword to train additional epochs to see if there are any additional performance again.
+I set the model to save in different files iteratively so I can analyse the progression in driving behaviours without having to manually interrupt or supervise the training cycles.
 
-I finally randomly shuffled the data set and put Y% of the data into a validation set. 
-
-I used this training data for training the model. The validation set helped determine if the model was over or under fitting. The ideal number of epochs was Z as evidenced by ... I used an adam optimizer so that manually training the learning rate wasn't necessary.
+I have not tried track 2. Though using only grayscales of track 1 data I don't believe the model will drive too far. However my hypothesis is that using a binary hash of color and saturation will get much closer to completing track 2 even without track 2 data.
+As exemplified below. It's much more intuitive for the CNN to learn where to drive. Instead of trying to make sense the where to drive based on a complexed image.
+It only needs to know 3 things. Fuzzy is ok, Borders are bad and darkness is your friend( You might need to give it some cookies for this one. )
+![alt text][image8]

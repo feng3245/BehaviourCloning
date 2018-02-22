@@ -3,7 +3,7 @@ import base64
 from datetime import datetime
 import os
 import shutil
-
+import cv2
 import numpy as np
 import socketio
 import eventlet
@@ -11,7 +11,8 @@ import eventlet.wsgi
 from PIL import Image
 from flask import Flask
 from io import BytesIO
-
+import asyncio
+import sys
 from keras.models import load_model
 import h5py
 from keras import __version__ as keras_version
@@ -46,7 +47,7 @@ class SimplePIController:
 controller = SimplePIController(0.1, 0.002)
 set_speed = 9
 controller.set_desired(set_speed)
-
+capturedImages = []
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -58,25 +59,27 @@ def telemetry(sid, data):
         # The current speed of the car
         speed = data["speed"]
         # The current image from the center camera of the car
-        imgString = data["image"]
-        image = Image.open(BytesIO(base64.b64decode(imgString)))
-        image_array = np.asarray(image)
+        byString = base64.b64decode(data["image"])
+        #Changed to cv2 image read
+        image = cv2.imdecode(np.fromstring(byString, np.uint8), cv2.IMREAD_COLOR)
+        image_array = np.reshape(cv2.cvtColor(cv2.cvtColor( np.asarray(image), cv2.COLOR_RGB2BGR), cv2.COLOR_BGR2GRAY), (160,320,1))
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
         throttle = controller.update(float(speed))
 
         print(steering_angle, throttle)
         send_control(steering_angle, throttle)
-
-        # save frame
-        if args.image_folder != '':
+		#cv2.imwrite is too slow. Saving images in memory then writing when a lap is down exiting after
+        if len(capturedImages) < 2150:
             timestamp = datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S_%f')[:-3]
             image_filename = os.path.join(args.image_folder, timestamp)
-            image.save('{}.jpg'.format(image_filename))
+            capturedImages.append([image_filename, image])
+        else:
+            [cv2.imwrite('{}.jpg'.format(img[0]), img[1]) for img in capturedImages]
+            sys.exit()
     else:
         # NOTE: DON'T EDIT THIS.
         sio.emit('manual', data={}, skip_sid=True)
-
 
 @sio.on('connect')
 def connect(sid, environ):
