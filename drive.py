@@ -1,5 +1,6 @@
 import argparse
 import base64
+import time
 from datetime import datetime
 import os
 import shutil
@@ -16,6 +17,7 @@ import sys
 from keras.models import load_model
 import h5py
 from keras import __version__ as keras_version
+from videowritethread import videowritethread
 
 sio = socketio.Server()
 app = Flask(__name__)
@@ -70,13 +72,19 @@ def telemetry(sid, data):
         print(steering_angle, throttle)
         send_control(steering_angle, throttle)
 		#cv2.imwrite is too slow. Saving images in memory then writing when a lap is down exiting after
+	#trying to use thread
+        timestamp = datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S_%f')[:-3]
+        videothread = videowritethread(time.clock(), os.path.join(args.image_folder, timestamp)+"thread",os.path.join(args.image_folder, timestamp), image)
+        videothread.start()
+        '''
         if len(capturedImages) < 2150:
             timestamp = datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S_%f')[:-3]
             image_filename = os.path.join(args.image_folder, timestamp)
             capturedImages.append([image_filename, image])
         else:
             [cv2.imwrite('{}.jpg'.format(img[0]), img[1]) for img in capturedImages]
-            sys.exit()
+       iii     sys.exit()
+       '''
     else:
         # NOTE: DON'T EDIT THIS.
         sio.emit('manual', data={}, skip_sid=True)
