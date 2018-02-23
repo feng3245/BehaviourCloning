@@ -69,7 +69,6 @@ def telemetry(sid, data):
 
         throttle = controller.update(float(speed))
 
-        print(steering_angle, throttle)
         send_control(steering_angle, throttle)
 		#cv2.imwrite is too slow. Saving images in memory then writing when a lap is down exiting after
 	#trying to use thread
